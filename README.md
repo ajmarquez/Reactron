@@ -7,11 +7,11 @@ This simple bot is created using a branch on a slack-ruby-client fork to allow t
 
 #How to
 
-(1) Go to slack and create a new bot, name it and cop the Token 
+(1) Go to slack and create a new bot, name it and copy the Token 
 
 (2) Clone this repository
 
-(3) Add an ```.env file`` with your Token from Slack
+(3) Add an ``.env file`` with your Token from Slack
 
 (4) Do ```build instal```and ```ruby reactron.rb```
 
