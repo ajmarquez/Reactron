@@ -4,11 +4,6 @@ require 'slack-ruby-client'
 
 
 
-### Class ReactionsList
-#### This class manage the main array that has the reactions being tracked
-#### remove => removes a tracked reaction
-#### clear  => clears the tracked reactions array
-#### show   => As the name explains, it shows the reactions
 class ReactionList
   attr_accessor :array
 
@@ -16,17 +11,14 @@ class ReactionList
     @array = array
   end
 
-  def remove(object=0)
-    @array.delete(object)
-  end
-
-  def clear
+  def clear!
     @array = []
   end
 
   def show
     @array.join(' ')
   end
+
 end
 
 
@@ -37,56 +29,63 @@ Slack.configure do |config|
   fail 'Missing ENV[SLACK_API_TOKEN]!' unless config.token
 end
 
+
 client = Slack::RealTime::Client.new
-
-## We create an instance of ReactionsList called main and set to 0
-main = ReactionList.new(0)
-
-## We create a variable called main_channel that saves the channel being used
-main_channel = 0
+main = ReactionList.new([])
+main_channel = ""
+bot_name = client.web_client.rtm_start['self']['name']
 
 
-### MESSAGE WRITTEN LOOP
-## In order to feed the instructions to the Philbot to start track the reactions
-## we must intercept the text written in the chat. For this (1) we detect when
-## a :message is created.
-##
-## Next (2) we make sure that the message is of type 'text'. Other types are files, comment_files
-## but this ones don't work for us
+
 client.on :message do |data|
   puts data
   client.typing channel: data['channel']
 
+  if data['text'] then
+    is_admin = client.web_client.users_info(user: data['user'])['user']['is_admin']
+  end
+
   case data['text']
 
-  ## To add a reaction list we set a series of commands:
-  ##
-  ## - When "philbot Track <reactions>" or "philbot track <reactions>" is written, next to a list of reactions separated by a blankspace
-  ##   Philbot save this reactions as an array
-  ## - When "philbot show" is written, a list of tracked reactions are showed
-  ## - When "Hello philbot is written, a greeting message from the bot is produced nd explains who to introduce the reactions
 
-when /^philbot [tT]rack (?<reactions>.*)$/ then
-    ## Then match[:reactions] must be created into an array of reactions
-    tracked_reactions = /^[tT]rack (?<reactions>.*)$/.match(data['text'])['reactions'].strip.split(" ")
-    main.array = tracked_reactions
-    client.message channel: data['channel'], text: "I'm phil-in your reactions!"
-    main_channel = data['channel']
+  when /^#{bot_name} [tT]rack (?<reactions>.*)$/ then
 
-   #when /^[rR]emove (?<reactions>.*)$/ then
-   #TO DO
-   #Then another array is created and compared with the Main Reaction array, if matched delete from array. If not found, tell the use
-   #client.message channel: data['channel'], text: "Reactions removed" # To be modified
- when 'philbot show' then
-    ## Puts reactions being tracked
-    client.message channel: data['channel'], text: "I'm keeping a eye on ---> #{main.show}"
-  when 'hello philbot' then
-    client.message channel: data['channel'], text: "Hi <@#{data['user']}>!, don't overREACT, ok? To add our reactions write 'track philbot' and add your reactions separated by a blanckspace."
-  when 'philbot reset' then
+    if is_admin == true then
+      main.array = /^#{bot_name} [tT]rack (?<reactions>.*)$/.match(data['text'])['reactions'].strip.split(" ")
+      client.message channel: data['channel'], text: "I'm tracking your reactions"
+      main_channel = data['channel']
+    else
+      client.message channel: data['channel'], text: "You are not authorize for this action."
+    end
+
+  when /^#{bot_name} show$/ then
+
+   if is_admin == true then
+     if !main.array.empty? then
+       client.message channel: data['channel'], text: "I'm currently tracking => #{main.show}"
+     else
+       client.message channel: data['channel'], text: "There are no reactions being tracked"
+     end
+   else
+     client.message channel: data['channel'], text: "You are not authorize for this action."
+   end
+
+  when /^hello #{bot_name}$/ then
+
+    if is_admin == true then
+      client.message channel: data['channel'], text: "Hello <@#{data['user']}>, I'm ready to begin! "
+    else
+      client.message channel: data['channel'], text: "Hello <@#{data['user']}>. I'm sorry but you are not authorize to track reactions"
+    end
+
+  when /^#{bot_name} reset$/ then
     ## Delete reactions array
-    main.clear
-    puts "Reactions array cleared"
-
+    if is_admin == true then
+      main.clear!
+      client.message channel: data['channel'], text: "Reactions are cleared"
+    else
+      client.message channel: data['channel'], text: "You are not authorize for this action."
+    end
   end
 end
 
@@ -117,7 +116,7 @@ client.on :reaction_added do |data|
 
     if dummy_list.sort == main.array.sort then   #(3) and (4)
       puts "THEY MATCH!"
-      client.message channel: main_channel, text: "And it's a match! http://i.imgur.com/QTGAq6N.gif "
+      client.message channel: main_channel, text: "And it's a match! "
     else
       puts "No match."
     end
@@ -126,7 +125,7 @@ end
 
 
 #To execute copy and paste this
-# SLACK_API_TOKEN=xoxb-10237477606-qCNwWBSnmWiIvoVcWzPxorXm  bundle exec ruby philbot.rb
+# SLACK_API_TOKEN=xoxb-10237477606-qCNwWBSnmWiIvoVcWzPxorXm  bundle exec ruby reactron.rb
 
 
 client.start!
